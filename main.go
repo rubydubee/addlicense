@@ -29,7 +29,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gobwas/glob"
 	"golang.org/x/sync/errgroup"
+	"gopkg.in/yaml.v2"
 )
 
 const helpText = `Usage: addlicense [flags] pattern [pattern ...]
@@ -53,6 +55,7 @@ var (
 	year      = flag.String("y", fmt.Sprint(time.Now().Year()), "copyright year(s)")
 	verbose   = flag.Bool("v", false, "verbose mode: print the name of the files that are modified")
 	checkonly = flag.Bool("check", false, "check only mode: verify presence of license headers and exit with non-zero code if missing")
+	config    = flag.String("config", "", "yaml config file, see examples/config.yml")
 )
 
 func main() {
@@ -91,6 +94,21 @@ func main() {
 		}
 	}
 
+	var c Config
+	if *config != "" {
+		yamlFile, err := ioutil.ReadFile(*config)
+		if err != nil {
+			log.Printf("extensions file: %v", err)
+			os.Exit(1)
+		}
+		err = yaml.Unmarshal(yamlFile, &c)
+		if err != nil {
+			log.Printf("unmarshal: %v", err)
+		}
+	}
+
+	ignoredPaths := c.IgnorePaths
+
 	// process at most 1000 files in parallel
 	ch := make(chan *file, 1000)
 	done := make(chan struct{})
@@ -106,7 +124,8 @@ func main() {
 						log.Printf("%s: %v", f.path, err)
 						return err
 					}
-					if lic == nil { // Unknown fileExtension
+					// Unknown fileExtension or ignored
+					if lic == nil || pathInIgnoredPaths(f.path, ignoredPaths) {
 						return nil
 					}
 					// Check if file has a license
@@ -120,7 +139,7 @@ func main() {
 						return errors.New("missing license header")
 					}
 				} else {
-					modified, err := addLicense(f.path, f.mode, t, data)
+					modified, err := addLicense(f.path, f.mode, t, data, ignoredPaths)
 					if err != nil {
 						log.Printf("%s: %v", f.path, err)
 						return err
@@ -146,10 +165,17 @@ func main() {
 	<-done
 }
 
+// Config is a struct used for parsing a yaml config file.
+type Config struct {
+	IgnorePaths []string `yaml:"ignorePaths"`
+}
+
 type file struct {
 	path string
 	mode os.FileMode
 }
+
+var ignoredPathsDefault = []string{"**.git/**", "**node_modules/**", "**.gradle/**"}
 
 func walk(ch chan<- *file, start string) {
 	filepath.Walk(start, func(path string, fi os.FileInfo, err error) error {
@@ -160,14 +186,27 @@ func walk(ch chan<- *file, start string) {
 		if fi.IsDir() {
 			return nil
 		}
+		if pathInIgnoredPaths(path, ignoredPathsDefault) {
+			return nil
+		}
 		ch <- &file{path, fi.Mode()}
 		return nil
 	})
 }
 
-func addLicense(path string, fmode os.FileMode, tmpl *template.Template, data *copyrightData) (bool, error) {
+func addLicense(path string, fmode os.FileMode, tmpl *template.Template,
+	data *copyrightData, ignoredPaths []string) (bool, error) {
+
+	if pathInIgnoredPaths(path, ignoredPaths) {
+		if *verbose {
+			log.Printf("%s: ignored", path)
+		}
+		return false, nil
+	}
+
 	var lic []byte
 	var err error
+
 	lic, err = licenseHeader(path, tmpl, data)
 	if err != nil || lic == nil {
 		return false, err
@@ -197,6 +236,17 @@ func fileHasLicense(path string) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+func pathInIgnoredPaths(path string, ignoredPaths []string) bool {
+	var g glob.Glob
+	for _, p := range ignoredPaths {
+		g = glob.MustCompile(p)
+		if g.Match(path) {
+			return true
+		}
+	}
+	return false
 }
 
 func licenseHeader(path string, tmpl *template.Template, data *copyrightData) ([]byte, error) {
