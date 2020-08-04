@@ -108,6 +108,7 @@ func main() {
 	}
 
 	ignoredPaths := c.IgnorePaths
+	fileExtensions := c.FileExtensions
 
 	// process at most 1000 files in parallel
 	ch := make(chan *file, 1000)
@@ -119,7 +120,7 @@ func main() {
 			wg.Go(func() error {
 				if *checkonly {
 					// Check if file extension is known
-					lic, err := licenseHeader(f.path, t, data)
+					lic, err := licenseHeader(f.path, t, data, fileExtensions)
 					if err != nil {
 						log.Printf("%s: %v", f.path, err)
 						return err
@@ -139,7 +140,7 @@ func main() {
 						return errors.New("missing license header")
 					}
 				} else {
-					modified, err := addLicense(f.path, f.mode, t, data, ignoredPaths)
+					modified, err := addLicense(f.path, f.mode, t, data, ignoredPaths, fileExtensions)
 					if err != nil {
 						log.Printf("%s: %v", f.path, err)
 						return err
@@ -165,9 +166,19 @@ func main() {
 	<-done
 }
 
+// FileExtensions is a struct used for parsing file-extension commenting patterns
+// from a config file.
+type FileExtensions []struct {
+	Extensions []string `yaml:"extensions"`
+	Top        string   `yaml:"top"`
+	Mid        string   `yaml:"mid"`
+	Bot        string   `yaml:"bot"`
+}
+
 // Config is a struct used for parsing a yaml config file.
 type Config struct {
-	IgnorePaths []string `yaml:"ignorePaths"`
+	IgnorePaths    []string       `yaml:"ignorePaths"`
+	FileExtensions FileExtensions `yaml:"fileExtensions"`
 }
 
 type file struct {
@@ -195,7 +206,7 @@ func walk(ch chan<- *file, start string) {
 }
 
 func addLicense(path string, fmode os.FileMode, tmpl *template.Template,
-	data *copyrightData, ignoredPaths []string) (bool, error) {
+	data *copyrightData, ignoredPaths []string, extensions FileExtensions) (bool, error) {
 
 	if pathInIgnoredPaths(path, ignoredPaths) {
 		if *verbose {
@@ -207,7 +218,12 @@ func addLicense(path string, fmode os.FileMode, tmpl *template.Template,
 	var lic []byte
 	var err error
 
-	lic, err = licenseHeader(path, tmpl, data)
+	lic, err = licenseHeader(path, tmpl, data, extensions)
+	if lic == nil && err == nil && *verbose {
+		log.Printf("%s: file extension not supported", path)
+		return false, nil
+	}
+
 	if err != nil || lic == nil {
 		return false, err
 	}
@@ -249,10 +265,24 @@ func pathInIgnoredPaths(path string, ignoredPaths []string) bool {
 	return false
 }
 
-func licenseHeader(path string, tmpl *template.Template, data *copyrightData) ([]byte, error) {
+func licenseHeader(path string, tmpl *template.Template, data *copyrightData,
+	extensions FileExtensions) ([]byte, error) {
 	var lic []byte
 	var err error
-	switch fileExtension(path) {
+	fileExtension := fileExtension(path)
+
+	// If a custom file-extension configuration was provided, use that.
+	if len(extensions) != 0 {
+		for _, e := range extensions {
+			if stringInSlice(fileExtension, e.Extensions) {
+				lic, err = prefix(tmpl, data, e.Top, e.Mid, e.Bot)
+				return lic, err
+			}
+		}
+		return nil, nil
+	}
+
+	switch fileExtension {
 	default:
 		return nil, nil
 	case ".c", ".h":
@@ -310,6 +340,15 @@ func hashBang(b []byte) []byte {
 		}
 	}
 	return nil
+}
+
+func stringInSlice(a string, list []string) bool {
+	for _, b := range list {
+		if a == b {
+			return true
+		}
+	}
+	return false
 }
 
 func hasLicense(b []byte) bool {
