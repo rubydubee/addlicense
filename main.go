@@ -109,6 +109,7 @@ func main() {
 
 	ignoredPaths := c.IgnorePaths
 	fileExtensions := c.FileExtensions
+	hasLicensePatterns := c.HasLicensePatterns
 
 	// process at most 1000 files in parallel
 	ch := make(chan *file, 1000)
@@ -130,7 +131,7 @@ func main() {
 						return nil
 					}
 					// Check if file has a license
-					isMissingLicenseHeader, err := fileHasLicense(f.path)
+					isMissingLicenseHeader, err := fileHasLicense(f.path, hasLicensePatterns)
 					if err != nil {
 						log.Printf("%s: %v", f.path, err)
 						return err
@@ -140,7 +141,7 @@ func main() {
 						return errors.New("missing license header")
 					}
 				} else {
-					modified, err := addLicense(f.path, f.mode, t, data, ignoredPaths, fileExtensions)
+					modified, err := addLicense(f.path, f.mode, t, data, ignoredPaths, fileExtensions, hasLicensePatterns)
 					if err != nil {
 						log.Printf("%s: %v", f.path, err)
 						return err
@@ -177,8 +178,9 @@ type FileExtensions []struct {
 
 // Config is a struct used for parsing a yaml config file.
 type Config struct {
-	IgnorePaths    []string       `yaml:"ignorePaths"`
-	FileExtensions FileExtensions `yaml:"fileExtensions"`
+	IgnorePaths        []string       `yaml:"ignorePaths"`
+	FileExtensions     FileExtensions `yaml:"fileExtensions"`
+	HasLicensePatterns []string       `yaml:"hasLicensePatterns"`
 }
 
 type file struct {
@@ -206,7 +208,8 @@ func walk(ch chan<- *file, start string) {
 }
 
 func addLicense(path string, fmode os.FileMode, tmpl *template.Template,
-	data *copyrightData, ignoredPaths []string, extensions FileExtensions) (bool, error) {
+	data *copyrightData, ignoredPaths []string, extensions FileExtensions,
+	hasLicensePatterns []string) (bool, error) {
 
 	if pathInIgnoredPaths(path, ignoredPaths) {
 		if *verbose {
@@ -229,7 +232,7 @@ func addLicense(path string, fmode os.FileMode, tmpl *template.Template,
 	}
 
 	b, err := ioutil.ReadFile(path)
-	if err != nil || hasLicense(b) {
+	if err != nil || hasLicense(b, hasLicensePatterns) {
 		return false, err
 	}
 
@@ -246,9 +249,9 @@ func addLicense(path string, fmode os.FileMode, tmpl *template.Template,
 }
 
 // fileHasLicense reports whether the file at path contains a license header.
-func fileHasLicense(path string) (bool, error) {
+func fileHasLicense(path string, hasLicensePatterns []string) (bool, error) {
 	b, err := ioutil.ReadFile(path)
-	if err != nil || hasLicense(b) {
+	if err != nil || hasLicense(b, hasLicensePatterns) {
 		return false, err
 	}
 	return true, nil
@@ -351,11 +354,21 @@ func stringInSlice(a string, list []string) bool {
 	return false
 }
 
-func hasLicense(b []byte) bool {
+func hasLicense(b []byte, hasLicensePatterns []string) bool {
 	n := 1000
 	if len(b) < 1000 {
 		n = len(b)
 	}
+
+	if len(hasLicensePatterns) != 0 {
+		for _, p := range hasLicensePatterns {
+			if bytes.Contains(bytes.ToLower(b[:n]), []byte(p)) {
+				return true
+			}
+		}
+		return false
+	}
+
 	return bytes.Contains(bytes.ToLower(b[:n]), []byte("copyright")) ||
 		bytes.Contains(bytes.ToLower(b[:n]), []byte("mozilla public"))
 }
