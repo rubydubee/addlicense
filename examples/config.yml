@@ -1,6 +1,9 @@
 # Paths to be ignored by addlicense
 ignorePaths: ["test/**"]
 
+# Patterns to determine whether a file already has a license
+hasLicensePatterns: ["copyright"]
+
 # File extension commenting format configuration
 fileExtensions:
   - extensions: [".c", ".h"]
