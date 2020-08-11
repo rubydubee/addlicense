@@ -6,11 +6,13 @@ by scanning directory patterns recursively.
 It modifies all source files in place and avoids adding a license header
 to any file that already has one.
 
-## install
+This is a forked and slightly evolved variant of [google/addlicense](https://github.com/google/addlicense)
 
-    go get -u github.com/google/addlicense
+## Install as a Go program
 
-## usage
+    go get -u github.com/nokia/addlicense
+
+## Usage as a Go program
 
     addlicense [flags] pattern [pattern ...]
 
@@ -24,11 +26,23 @@ to any file that already has one.
 The pattern argument can be provided multiple times, and may also refer
 to single files.
 
-## configuration
+## Pull from DockerHub
+
+    docker pull nokia/addlicense-nokia
+
+## Run as a container
+
+    run_addlicense.sh "addlicense-options"
+
+Where the addlicense-options are the options for addlicense (in quotes).
+
+The actual working directory is used as the starting point to run addlicense.
+
+## Configuration
+
 Paths to be ignored by addlicense can be configured in a yaml config file and passed to addlicense using the `-config` option. Patterns that determine whether a file already has a license and file extension comment commenting formats can also be configured there. For an example, see the example [config.yml](https://github.com/nokia/addlicense/blob/master/examples/config.yml).
 
-## license
+## License
 
 Apache 2.0
 
-This is not an official Google product.

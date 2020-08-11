@@ -5,4 +5,4 @@
 
 tag=${TAG:="latest"}
 echo "Building addlicense container with tag: $tag"
-docker build -t addlicense:$tag . || echo "Build failed."
+docker build -t addlicense-nokia:$tag . || echo "Build failed."
