@@ -7,9 +7,9 @@
 # Examples of how to use:
 # 1. Run addlicense with check option: ./run_addlicense "-check"
 # 2. Run addlicense with some more options: 
-#    ./run_addlicense "-v -config congig.yml -c Nokia"
+#    ./run_addlicense "-v -config config.yml -c Nokia"
 # 3. Run specific tag of the addlicense image: 
 #    TAG="something" ./run_addlicense.sh "-check"
 
 tag=${TAG:="latest"}
-docker run -e OPTIONS="$@" --rm -it -v $(pwd):/myapp addlicense:$tag
+docker run -e OPTIONS="$@" --rm -it -v $(pwd):/myapp addlicense-nokia:$tag
