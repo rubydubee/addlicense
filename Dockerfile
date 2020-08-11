@@ -19,6 +19,13 @@ FROM alpine:latest
 # Copy the binary from the build
 COPY --from=build /go/bin/addlicense /
 
+# Copy the example config file
+COPY examples/config.yml config.yml
+
+# Copy copyright texts
+COPY copyright-texts/ /copyright-texts/
+
+
 # Options for addlicense
 ENV OPTIONS ""
 
