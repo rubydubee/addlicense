@@ -38,6 +38,14 @@ Where the addlicense-options are the options for addlicense (in quotes).
 
 The actual working directory is used as the starting point to run addlicense.
 
+To use with the default configuration file and BSD 3 Clause copyright texts use 
+    
+    run_addlicense.sh "-f /copyright-texts/bsd-3-clause -config /config.yml"
+
+or 
+    
+    docker run -e OPTIONS="-f /copyright-texts/bsd-3-clause -config /config.yml" --rm -it -v $(pwd):/myapp addlicense-nokia:latest
+
 ## Configuration
 
 Paths to be ignored by addlicense can be configured in a yaml config file and passed to addlicense using the `-config` option. Patterns that determine whether a file already has a license and file extension comment commenting formats can also be configured there. For an example, see the example [config.yml](https://github.com/nokia/addlicense/blob/master/examples/config.yml).
