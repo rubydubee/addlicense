@@ -12,4 +12,4 @@
 #    TAG="something" ./run_addlicense.sh "-check"
 
 tag=${TAG:="latest"}
-docker run -e OPTIONS="$@" --rm -it -v $(pwd):/myapp addlicense-nokia:$tag
+docker run -e OPTIONS="$@" --rm -it -v $(pwd):/myapp nokia/addlicense-nokia:$tag
