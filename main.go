@@ -53,7 +53,7 @@ var (
 	license   = flag.String("l", "apache", "license type: apache, bsd, mit, mpl")
 	licensef  = flag.String("f", "", "license file")
 	year      = flag.String("y", fmt.Sprint(time.Now().Year()), "copyright year(s)")
-	verbose   = flag.Bool("v", false, "verbose mode: print the name of the files that are modified")
+	silent    = flag.Bool("s", false, "silent mode: do not log anything to the console")
 	checkonly = flag.Bool("check", false, "check only mode: verify presence of license headers and exit with non-zero code if missing")
 	config    = flag.String("config", "", "yaml config file, see examples/config.yml")
 )
@@ -72,6 +72,13 @@ func main() {
 	data := &copyrightData{
 		Year:   *year,
 		Holder: *holder,
+	}
+
+	for _, p := range flag.Args() {
+		targetPath, err := filepath.Abs(p)
+		if err == nil && !(*silent) {
+			log.Printf("Target: %s", targetPath)
+		}
 	}
 
 	var t *template.Template
@@ -104,6 +111,10 @@ func main() {
 		err = yaml.Unmarshal(yamlFile, &c)
 		if err != nil {
 			log.Printf("unmarshal: %v", err)
+		}
+		if !(*silent) {
+			configPath, _ := filepath.Abs(*config)
+			log.Printf("Using configuration: %s", configPath)
 		}
 	}
 
@@ -146,7 +157,7 @@ func main() {
 						log.Printf("%s: %v", f.path, err)
 						return err
 					}
-					if *verbose && modified {
+					if !(*silent) && modified {
 						log.Printf("%s modified", f.path)
 					}
 				}
@@ -212,7 +223,7 @@ func addLicense(path string, fmode os.FileMode, tmpl *template.Template,
 	hasLicensePatterns []string) (bool, error) {
 
 	if pathInIgnoredPaths(path, ignoredPaths) {
-		if *verbose {
+		if !(*silent) {
 			log.Printf("%s: ignored", path)
 		}
 		return false, nil
@@ -222,7 +233,7 @@ func addLicense(path string, fmode os.FileMode, tmpl *template.Template,
 	var err error
 
 	lic, err = licenseHeader(path, tmpl, data, extensions)
-	if lic == nil && err == nil && *verbose {
+	if lic == nil && err == nil && !(*silent) {
 		log.Printf("%s: file extension not supported", path)
 		return false, nil
 	}
