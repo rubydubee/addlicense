@@ -1,6 +1,6 @@
-module github.com/nokia/addlicense
+module github.com/rubydubee/addlicense
 
-go 1.13
+go 1.16
 
 require (
 	github.com/gobwas/glob v0.2.3
